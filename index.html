@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phyllotaxis SVG Generator</title>
+<style>
+  :root {
+    --border: #d5d5d5;
+    --muted: #666;
+    --text: #111;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #ddd;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .app {
+    width: min(1180px, 100%);
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  .controls {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    letter-spacing: -.02em;
+  }
+
+  .intro {
+    margin: 0 0 20px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .section-title {
+    margin: 22px 0 8px;
+    padding-top: 14px;
+    border-top: 1px solid #eee;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #777;
+  }
+
+  .control {
+    margin: 16px 0;
+  }
+
+  .control-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  label {
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  output {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    color: var(--muted);
+    min-width: 58px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: #111;
+    cursor: pointer;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 18px 0;
+    padding: 12px 0;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+  }
+
+  .switch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    flex: 0 0 auto;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    inset: 0;
+    background: #ccc;
+    border-radius: 99px;
+    cursor: pointer;
+    transition: .18s;
+  }
+
+  .slider::before {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    left: 3px;
+    top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: .18s;
+  }
+
+  .switch input:checked + .slider {
+    background: #111;
+  }
+
+  .switch input:checked + .slider::before {
+    transform: translateX(20px);
+  }
+
+  .mode {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .mode button,
+  .download {
+    appearance: none;
+    border: 1px solid #bbb;
+    background: white;
+    color: #111;
+    border-radius: 8px;
+    padding: 10px 9px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  .mode button.active {
+    background: #111;
+    color: white;
+    border-color: #111;
+  }
+
+  .download {
+    width: 100%;
+    margin-top: 12px;
+    padding: 13px;
+    border-color: #111;
+    background: #111;
+    color: white;
+    font-size: 13px;
+  }
+
+  .download:hover { opacity: .88; }
+
+  .hint {
+    margin: 14px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .canvas-wrap {
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+  }
+
+  .stage {
+    width: min(800px, 100%);
+    aspect-ratio: 1;
+    background: white;
+    border: 1px solid #c9c9c9;
+    box-shadow: 0 12px 40px rgba(0,0,0,.14);
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  @media (max-width: 850px) {
+    body { padding: 12px; }
+    .app { grid-template-columns: 1fr; }
+    .controls { order: 2; }
+    .canvas-wrap { order: 1; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="controls">
+    <h1>Phyllotaxis Generator</h1>
+    <p class="intro">Circle-based spiral patterns sized for an 800 × 800 SVG canvas.</p>
+
+    <div class="section-title">Pattern</div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="count">Circle count</label>
+        <output id="countValue">900</output>
+      </div>
+      <input id="count" type="range" min="50" max="3000" value="900" step="10">
+    </div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="spacing">Circle spacing</label>
+        <output id="spacingValue">6.0</output>
+      </div>
+      <input id="spacing" type="range" min="0.5" max="18" value="6" step="0.1">
+    </div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="angle">Angle</label>
+        <output id="angleValue">137.508°</output>
+      </div>
+      <input id="angle" type="range" min="0" max="360" value="137.507764" step="0.001">
+    </div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="hole">Center hole</label>
+        <output id="holeValue">0</output>
+      </div>
+      <input id="hole" type="range" min="0" max="260" value="0" step="1">
+    </div>
+
+    <div class="toggle-row">
+      <label for="golden">Golden spiral distribution</label>
+      <label class="switch">
+        <input id="golden" type="checkbox">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="section-title">Circle size &amp; contrast</div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="minSize">Inner circle size</label>
+        <output id="minSizeValue">0.8</output>
+      </div>
+      <input id="minSize" type="range" min="0.2" max="10" value="0.8" step="0.1">
+    </div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="maxSize">Outer circle size</label>
+        <output id="maxSizeValue">7.0</output>
+      </div>
+      <input id="maxSize" type="range" min="0.5" max="18" value="7" step="0.1">
+    </div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="contrast">Size contrast</label>
+        <output id="contrastValue">70%</output>
+      </div>
+      <input id="contrast" type="range" min="0" max="100" value="70" step="1">
+    </div>
+
+    <div class="control">
+      <div class="control-head">
+        <label for="growth">Radial growth</label>
+        <output id="growthValue">50%</output>
+      </div>
+      <input id="growth" type="range" min="1" max="100" value="50" step="1">
+    </div>
+
+    <div class="section-title">Color</div>
+
+    <div class="control">
+      <div class="control-head">
+        <label>Mode</label>
+        <output id="colorValue">Black on white</output>
+      </div>
+      <div class="mode">
+        <button type="button" class="active" data-mode="light">Black / White</button>
+        <button type="button" data-mode="dark">White / Black</button>
+      </div>
+    </div>
+
+    <button class="download" id="download">Download SVG</button>
+
+    <p class="hint">
+      Inner circles start small and grow toward the outside. Size contrast controls
+      how strongly they change. Spacing and radial growth work in both normal and
+      golden distribution modes.
+    </p>
+  </section>
+
+  <section class="canvas-wrap">
+    <div class="stage" id="stage"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const SIZE = 800;
+  const CX = SIZE / 2;
+  const CY = SIZE / 2;
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const GOLDEN_ANGLE = 180 * (3 - Math.sqrt(5));
+
+  const els = {
+    count: document.getElementById('count'),
+    spacing: document.getElementById('spacing'),
+    angle: document.getElementById('angle'),
+    hole: document.getElementById('hole'),
+    golden: document.getElementById('golden'),
+    minSize: document.getElementById('minSize'),
+    maxSize: document.getElementById('maxSize'),
+    contrast: document.getElementById('contrast'),
+    growth: document.getElementById('growth'),
+    stage: document.getElementById('stage'),
+    download: document.getElementById('download'),
+
+    countValue: document.getElementById('countValue'),
+    spacingValue: document.getElementById('spacingValue'),
+    angleValue: document.getElementById('angleValue'),
+    holeValue: document.getElementById('holeValue'),
+    minSizeValue: document.getElementById('minSizeValue'),
+    maxSizeValue: document.getElementById('maxSizeValue'),
+    contrastValue: document.getElementById('contrastValue'),
+    growthValue: document.getElementById('growthValue'),
+    colorValue: document.getElementById('colorValue')
+  };
+
+  let colorMode = 'light';
+
+  function getParams() {
+    return {
+      count: Number(els.count.value),
+      spacing: Number(els.spacing.value),
+      angle: Number(els.angle.value),
+      hole: Number(els.hole.value),
+      golden: els.golden.checked,
+      minSize: Number(els.minSize.value),
+      maxSize: Number(els.maxSize.value),
+      contrast: Number(els.contrast.value) / 100,
+      growth: Number(els.growth.value) / 100
+    };
+  }
+
+  function updateLabels() {
+    els.countValue.value = Number(els.count.value).toLocaleString();
+    els.spacingValue.value = Number(els.spacing.value).toFixed(1);
+    els.angleValue.value = Number(els.angle.value).toFixed(3) + '°';
+    els.holeValue.value = Number(els.hole.value).toFixed(0);
+    els.minSizeValue.value = Number(els.minSize.value).toFixed(1);
+    els.maxSizeValue.value = Number(els.maxSize.value).toFixed(1);
+    els.contrastValue.value = Number(els.contrast.value).toFixed(0) + '%';
+    els.growthValue.value = Number(els.growth.value).toFixed(0) + '%';
+  }
+
+  // Returns a 0..1 radial position for each circle.
+  // The "growth" slider changes how quickly the pattern opens.
+  function radialProgress(i, p) {
+    const t = i / Math.max(1, p.count - 1);
+
+    if (!p.golden) {
+      // sqrt distribution is the classic phyllotaxis relationship.
+      // growth controls how strongly the outer region opens up.
+      const exponent = 0.50 + (1 - p.growth) * 0.95;
+      return Math.pow(t, exponent);
+    }
+
+    // Golden mode:
+    // A logarithmic/golden-ratio curve controls radial expansion.
+    // The spacing slider remains active by controlling the effective
+    // number of golden growth steps across the available radius.
+    const steps = 2 + p.growth * 16;
+    const goldenValue = Math.pow(PHI, t * steps) - 1;
+    const goldenMax = Math.pow(PHI, steps) - 1;
+
+    return goldenMax === 0 ? t : goldenValue / goldenMax;
+  }
+
+  function pointFor(i, p, maxR) {
+    const progress = radialProgress(i, p);
+
+    // Spacing controls how much radial space each circle family occupies.
+    // At higher spacing values, the pattern uses more of the available
+    // canvas. This applies identically to golden and normal modes.
+    const spacingFactor = Math.min(1, p.spacing / 8);
+    const usableR = Math.max(0, maxR - p.hole);
+    const radialScale = 0.35 + spacingFactor * 0.65;
+
+    const r = p.hole + usableR * radialScale * progress;
+
+    // Keep every circle safely inside the 800x800 viewBox.
+    if (r > maxR) return null;
+
+    const angle = i * p.angle * Math.PI / 180;
+
+    // Circle-size progression:
+    // contrast=0 means nearly uniform circles.
+    // contrast=1 gives the full min -> max size range.
+    const sizeProgress = Math.pow(progress, 0.72);
+    const fullGrowth = p.minSize + (p.maxSize - p.minSize) * sizeProgress;
+    const uniformSize = (p.minSize + p.maxSize) / 2;
+    const radius = uniformSize + (fullGrowth - uniformSize) * p.contrast;
+
+    return {
+      x: CX + r * Math.cos(angle),
+      y: CY + r * Math.sin(angle),
+      r: Math.max(0.1, radius)
+    };
+  }
+
+  function buildSVG() {
+    const p = getParams();
+    const background = colorMode === 'light' ? '#ffffff' : '#000000';
+    const foreground = colorMode === 'light' ? '#000000' : '#ffffff';
+
+    const maxCircle = Math.max(p.minSize, p.maxSize);
+    const maxR = Math.min(CX, CY) - maxCircle - 2;
+
+    const parts = [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" role="img" aria-label="Phyllotaxis pattern">`,
+      `<rect width="${SIZE}" height="${SIZE}" fill="${background}"/>`,
+      `<g fill="${foreground}">`
+    ];
+
+    for (let i = 0; i < p.count; i++) {
+      const pt = pointFor(i, p, maxR);
+      if (!pt) continue;
+
+      parts.push(
+        `<circle cx="${pt.x.toFixed(3)}" cy="${pt.y.toFixed(3)}" r="${pt.r.toFixed(3)}"/>`
+      );
+    }
+
+    parts.push('</g></svg>');
+    return parts.join('');
+  }
+
+  function render() {
+    updateLabels();
+    els.stage.innerHTML = buildSVG();
+  }
+
+  function downloadSVG() {
+    const svg = buildSVG();
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'phyllotaxis-800x800.svg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
+
+  document.querySelectorAll('input[type="range"], #golden').forEach(el => {
+    el.addEventListener('input', render);
+    el.addEventListener('change', render);
+  });
+
+  document.querySelectorAll('.mode button').forEach(button => {
+    button.addEventListener('click', () => {
+      colorMode = button.dataset.mode;
+
+      document.querySelectorAll('.mode button')
+        .forEach(b => b.classList.remove('active'));
+
+      button.classList.add('active');
+      els.colorValue.value =
+        colorMode === 'light' ? 'Black on white' : 'White on black';
+
+      render();
+    });
+  });
+
+  els.download.addEventListener('click', downloadSVG);
+
+  // Start on the classic golden angle.
+  els.angle.value = GOLDEN_ANGLE.toFixed(6);
+
+  render();
+})();
+</script>
+</body>
+</html>
